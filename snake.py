@@ -84,7 +84,7 @@ class CyberSnake:
         self.game_state = 'menu'  # menu, playing, paused, game_over
     
     def spawn_food(self):
-        """生成食物位置（支持特殊食物类型）"""
+        """生成食物位置（支持特殊食物类型 + 安全区域）"""
         grid_w = self.config['width'] // self.config['cell_size']
         grid_h = self.config['height'] // self.config['cell_size']
         
@@ -95,9 +95,31 @@ class CyberSnake:
             special_types = ['double', 'speed', 'slow', 'bonus']
             self.food_type = random.choice(special_types)
         
+        # 安全区域：离边界至少 3 格，随分数增加缩小
+        min_safe_dist = max(3, int((self.score / 10) ** 0.5))
+        safe_x_min = min_safe_dist
+        safe_x_max = grid_w - min_safe_dist - 1
+        safe_y_min = min_safe_dist
+        safe_y_max = grid_h - min_safe_dist - 1
+        
+        # 尝试在安全区生成 10 次
+        attempts = 0
+        while attempts < 10:
+            x = random.randint(max(0, safe_x_min), max(safe_x_min, safe_x_max))
+            y = random.randint(max(0, safe_y_min), max(safe_y_min, safe_y_max))
+            pos = (x, y)
+            
+            # 检查离蛇头的距离（至少 5 格）
+            head_x, head_y = self.snake[0]
+            if abs(x - head_x) >= 5 or abs(y - head_y) >= 5:
+                return pos
+            attempts += 1
+        
+        # 安全区失败，回退到全图（但远离蛇头 8 格）
+        head_x, head_y = self.snake[0]
         while True:
             pos = (random.randint(0, grid_w - 1), random.randint(0, grid_h - 1))
-            if pos not in self.snake:
+            if pos not in self.snake and (abs(pos[0] - head_x) >= 8 or abs(pos[1] - head_y) >= 8):
                 return pos
     
     def init_sound(self):

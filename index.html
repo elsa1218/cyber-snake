@@ -657,12 +657,43 @@
                 type = types[Math.floor(Math.random() * types.length)];
             }
             let pos;
+            
+            // 安全区域：离边界至少 3 格，离蛇至少 5 格
+            const minSafeDist = Math.max(3, Math.floor(Math.sqrt(score / 10)));
+            const safeZone = {
+                minX: minSafeDist,
+                maxX: GRID_W - minSafeDist - 1,
+                minY: minSafeDist,
+                maxY: GRID_H - minSafeDist - 1
+            };
+            
+            // 尝试在安全区生成 10 次
+            let attempts = 0;
             do {
                 pos = {
-                    x: Math.floor(Math.random() * GRID_W),
-                    y: Math.floor(Math.random() * GRID_H)
+                    x: Math.floor(Math.random() * (safeZone.maxX - safeZone.minX) + safeZone.minX),
+                    y: Math.floor(Math.random() * (safeZone.maxY - safeZone.minY) + safeZone.minY)
                 };
-            } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+                attempts++;
+            } while (
+                attempts < 10 &&
+                snake.some(seg => 
+                    Math.abs(seg.x - pos.x) < 5 && Math.abs(seg.y - pos.y) < 5
+                )
+            );
+            
+            // 如果安全区失败，回退到全图（但远离蛇）
+            if (attempts >= 10) {
+                do {
+                    pos = {
+                        x: Math.floor(Math.random() * GRID_W),
+                        y: Math.floor(Math.random() * GRID_H)
+                    };
+                } while (snake.some(seg => 
+                    Math.abs(seg.x - pos.x) < 8 && Math.abs(seg.y - pos.y) < 8
+                ));
+            }
+            
             food = { ...pos, ...FOOD_TYPES[type], type };
         }
 
