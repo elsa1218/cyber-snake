@@ -22,6 +22,24 @@ COLORS = {
     'glow': (255, 100, 200),       # 发光效果
 }
 
+# 🎭 蛇皮肤系统（emoji 主题）
+SKINS = {
+    'cyber': {'head': '🤖', 'body': '■', 'color': COLORS['snake_head']},
+    'classic': {'head': '🐍', 'body': '●', 'color': (0, 200, 0)},
+    'rainbow': {'head': '🦄', 'body': '◆', 'color': (255, 0, 255)},
+    'fire': {'head': '🔥', 'body': '▲', 'color': (255, 100, 0)},
+    'ghost': {'head': '👻', 'body': '○', 'color': (200, 200, 200)},
+}
+
+# 🍎 特殊食物类型
+FOOD_TYPES = {
+    'normal': {'color': COLORS['food'], 'points': 10, 'effect': None, 'emoji': '🍎'},
+    'double': {'color': (255, 215, 0), 'points': 20, 'effect': 'double', 'emoji': '⭐', 'duration': 10},
+    'speed': {'color': (0, 255, 0), 'points': 15, 'effect': 'speed', 'emoji': '⚡', 'duration': 8},
+    'slow': {'color': (0, 100, 255), 'points': 15, 'effect': 'slow', 'emoji': '🐌', 'duration': 8},
+    'bonus': {'color': (255, 0, 255), 'points': 50, 'effect': 'bonus', 'emoji': '💎', 'duration': 0},
+}
+
 # 🎮 游戏配置
 CONFIG = {
     'width': 800,
@@ -51,22 +69,76 @@ class CyberSnake:
         center_y = self.config['height'] // (2 * self.config['cell_size'])
         self.snake = [(center_x, center_y)]
         self.direction = (1, 0)  # 初始向右
-        self.food = self.spawn_food()
         self.score = 0
         self.game_over = False
         self.level = 1
         self.particles = []  # 粒子效果列表
         self.show_leaderboard = False
+        self.current_skin = 'cyber'
+        self.active_effects = {}  # 当前激活的效果
+        self.food_type = 'normal'
+        self.food = self.spawn_food()
         self.load_leaderboard()
+        self.init_sound()
     
     def spawn_food(self):
-        """生成食物位置"""
+        """生成食物位置（支持特殊食物类型）"""
         grid_w = self.config['width'] // self.config['cell_size']
         grid_h = self.config['height'] // self.config['cell_size']
+        
+        # 随机决定食物类型（80% 普通，20% 特殊）
+        if random.random() < 0.8:
+            self.food_type = 'normal'
+        else:
+            special_types = ['double', 'speed', 'slow', 'bonus']
+            self.food_type = random.choice(special_types)
+        
         while True:
             pos = (random.randint(0, grid_w - 1), random.randint(0, grid_h - 1))
             if pos not in self.snake:
                 return pos
+    
+    def init_sound(self):
+        """初始化音效系统"""
+        pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+        self.sounds = {}
+        # 用 pygame 合成简单音效（不需要外部文件）
+        self.sound_enabled = True
+    
+    def play_sound(self, sound_type):
+        """播放音效"""
+        if not self.sound_enabled:
+            return
+        # 简化版本：用 print 代替实际音效（避免复杂音频生成）
+        # 实际项目中可以添加真实的音效文件
+        pass
+    
+    def apply_effect(self, effect_type):
+        """应用食物效果"""
+        if effect_type == 'double':
+            self.active_effects['double_score'] = 10
+        elif effect_type == 'speed':
+            self.config['fps'] = min(25, self.config['fps'] + 5)
+            self.active_effects['speed'] = 8
+        elif effect_type == 'slow':
+            self.config['fps'] = max(5, self.config['fps'] - 3)
+            self.active_effects['slow'] = 8
+        elif effect_type == 'bonus':
+            self.score += 100
+    
+    def update_effects(self):
+        """更新效果计时器"""
+        for effect in list(self.active_effects.keys()):
+            self.active_effects[effect] -= 1
+            if self.active_effects[effect] <= 0:
+                if effect == 'speed' or effect == 'slow':
+                    self.config['fps'] = 10 + self.level
+                del self.active_effects[effect]
+    
+    def change_skin(self, skin_name):
+        """切换蛇皮肤"""
+        if skin_name in SKINS:
+            self.current_skin = skin_name
     
     def handle_events(self):
         """处理事件"""
@@ -97,6 +169,18 @@ class CyberSnake:
             self.reset_game()
         elif key == pygame.K_h:
             self.show_leaderboard = True
+        elif key == pygame.K_1:
+            self.change_skin('cyber')
+        elif key == pygame.K_2:
+            self.change_skin('classic')
+        elif key == pygame.K_3:
+            self.change_skin('rainbow')
+        elif key == pygame.K_4:
+            self.change_skin('fire')
+        elif key == pygame.K_5:
+            self.change_skin('ghost')
+        elif key == pygame.K_m:
+            self.sound_enabled = not self.sound_enabled
         elif key == pygame.K_ESCAPE:
             sys.exit()
     
@@ -121,8 +205,14 @@ class CyberSnake:
         
         # 检测吃食物
         if new_head == self.food:
-            self.score += 10
-            self.create_particles(new_head[0], new_head[1], COLORS['food'])
+            food_data = FOOD_TYPES.get(self.food_type, FOOD_TYPES['normal'])
+            points = food_data['points']
+            if 'double_score' in self.active_effects:
+                points *= 2
+            self.score += points
+            self.play_sound('eat')
+            self.create_particles(new_head[0], new_head[1], food_data['color'])
+            self.apply_effect(food_data['effect'])
             self.food = self.spawn_food()
             # 每 50 分升级
             if self.score % 50 == 0:
@@ -131,8 +221,9 @@ class CyberSnake:
         else:
             self.snake.pop()
         
-        # 更新粒子
+        # 更新粒子和效果
         self.update_particles()
+        self.update_effects()
     
     def check_collision(self, pos):
         """检测碰撞"""
@@ -190,7 +281,11 @@ class CyberSnake:
                            (0, y), (self.config['width'], y))
     
     def draw_snake(self):
-        """绘制蛇（带发光效果）"""
+        """绘制蛇（带皮肤系统）"""
+        skin = SKINS.get(self.current_skin, SKINS['cyber'])
+        color = skin['color']
+        
+        # 绘制蛇身
         for i, (x, y) in enumerate(self.snake):
             rect = pygame.Rect(
                 x * self.config['cell_size'] + 1,
@@ -198,12 +293,17 @@ class CyberSnake:
                 self.config['cell_size'] - 2,
                 self.config['cell_size'] - 2
             )
-            color = COLORS['snake_head'] if i == 0 else COLORS['snake_body']
             pygame.draw.rect(self.screen, color, rect, border_radius=5)
-            
-            # 蛇头画眼睛
-            if i == 0:
-                self.draw_eyes(x, y)
+        
+        # 绘制蛇头 emoji
+        head_x, head_y = self.snake[0]
+        emoji_font = pygame.font.Font(None, self.config['cell_size'] * 2)
+        emoji_text = emoji_font.render(skin['head'], True, color)
+        emoji_rect = emoji_text.get_rect(center=(
+            head_x * self.config['cell_size'] + self.config['cell_size'] // 2,
+            head_y * self.config['cell_size'] + self.config['cell_size'] // 2
+        ))
+        self.screen.blit(emoji_text, emoji_rect)
     
     def draw_eyes(self, x, y):
         """绘制蛇头眼睛"""
@@ -230,28 +330,43 @@ class CyberSnake:
         pygame.draw.circle(self.screen, (255, 255, 255), eye2, eye_size)
     
     def draw_food(self):
-        """绘制食物（霓虹球）"""
+        """绘制食物（带类型 emoji）"""
         x, y = self.food
+        food_data = FOOD_TYPES.get(self.food_type, FOOD_TYPES['normal'])
+        
+        # 绘制外发光
         center = (
             x * self.config['cell_size'] + self.config['cell_size'] // 2,
             y * self.config['cell_size'] + self.config['cell_size'] // 2
         )
-        radius = self.config['cell_size'] // 2 - 2
+        pygame.draw.circle(self.screen, COLORS['glow'], center, 12)
+        pygame.draw.circle(self.screen, food_data['color'], center, 8)
         
-        # 外发光
-        pygame.draw.circle(self.screen, COLORS['glow'], center, radius + 2)
-        # 内球
-        pygame.draw.circle(self.screen, COLORS['food'], center, radius)
+        # 绘制食物 emoji
+        emoji_font = pygame.font.Font(None, self.config['cell_size'] * 2)
+        emoji_text = emoji_font.render(food_data['emoji'], True, (255, 255, 255))
+        emoji_rect = emoji_text.get_rect(center=center)
+        self.screen.blit(emoji_text, emoji_rect)
     
     def draw_ui(self):
         """绘制 UI"""
         score_text = self.font.render(f'🏆 Score: {self.score}', True, COLORS['text'])
         level_text = self.font.render(f'⚡ Level: {self.level}', True, COLORS['text'])
+        skin_text = self.font.render(f'🎭 Skin: {self.current_skin}', True, COLORS['glow'])
         self.screen.blit(score_text, (10, 10))
         self.screen.blit(level_text, (10, 45))
+        self.screen.blit(skin_text, (10, 80))
+        
+        # 显示激活的效果
+        effect_y = 115
+        for effect, duration in self.active_effects.items():
+            effect_color = COLORS['food'] if effect == 'double_score' else (255, 255, 0)
+            effect_txt = self.font.render(f'{effect}: {duration}s', True, effect_color)
+            self.screen.blit(effect_txt, (10, effect_y))
+            effect_y += 30
         
         # 控制提示
-        hint = self.font.render('↑↓←→ 移动 | R 重来 | ESC 退出 | H 排行榜', True, (100, 100, 150))
+        hint = self.font.render('↑↓←→ 移动 | 1-5 换皮肤 | R 重来 | H 排行榜 | M 音效 | ESC 退出', True, (100, 100, 150))
         self.screen.blit(hint, (10, self.config['height'] - 40))
     
     def create_particles(self, x, y, color, count=15):
