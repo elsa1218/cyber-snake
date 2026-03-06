@@ -7,6 +7,9 @@
 import pygame
 import random
 import sys
+import math
+import json
+import os
 
 # 🎨 赛博朋克配色方案
 COLORS = {
@@ -52,6 +55,9 @@ class CyberSnake:
         self.score = 0
         self.game_over = False
         self.level = 1
+        self.particles = []  # 粒子效果列表
+        self.show_leaderboard = False
+        self.load_leaderboard()
     
     def spawn_food(self):
         """生成食物位置"""
@@ -73,6 +79,11 @@ class CyberSnake:
     
     def handle_keydown(self, key):
         """处理按键"""
+        # 排行榜显示时按任意键返回
+        if self.show_leaderboard:
+            self.show_leaderboard = False
+            return
+        
         # 防止直接反向
         if key == pygame.K_UP and self.direction != (0, 1):
             self.direction = (0, -1)
@@ -84,12 +95,15 @@ class CyberSnake:
             self.direction = (1, 0)
         elif key == pygame.K_r and self.game_over:
             self.reset_game()
+        elif key == pygame.K_h:
+            self.show_leaderboard = True
         elif key == pygame.K_ESCAPE:
             sys.exit()
     
     def update(self):
         """更新游戏状态"""
-        if self.game_over:
+        if self.game_over or self.show_leaderboard:
+            self.update_particles()
             return
         
         # 移动蛇
@@ -100,6 +114,7 @@ class CyberSnake:
         # 检测碰撞
         if self.check_collision(new_head):
             self.game_over = True
+            self.save_leaderboard()
             return
         
         self.snake.insert(0, new_head)
@@ -107,6 +122,7 @@ class CyberSnake:
         # 检测吃食物
         if new_head == self.food:
             self.score += 10
+            self.create_particles(new_head[0], new_head[1], COLORS['food'])
             self.food = self.spawn_food()
             # 每 50 分升级
             if self.score % 50 == 0:
@@ -114,6 +130,9 @@ class CyberSnake:
                 self.config['fps'] = min(20, 10 + self.level)
         else:
             self.snake.pop()
+        
+        # 更新粒子
+        self.update_particles()
     
     def check_collision(self, pos):
         """检测碰撞"""
@@ -145,12 +164,19 @@ class CyberSnake:
         # 绘制食物
         self.draw_food()
         
+        # 绘制粒子
+        self.draw_particles()
+        
         # 绘制 UI
         self.draw_ui()
         
         # 游戏结束画面
         if self.game_over:
             self.draw_game_over()
+        
+        # 排行榜
+        if self.show_leaderboard:
+            self.draw_leaderboard()
         
         pygame.display.flip()
     
@@ -225,8 +251,90 @@ class CyberSnake:
         self.screen.blit(level_text, (10, 45))
         
         # 控制提示
-        hint = self.font.render('↑↓←→ 移动 | R 重来 | ESC 退出', True, (100, 100, 150))
+        hint = self.font.render('↑↓←→ 移动 | R 重来 | ESC 退出 | H 排行榜', True, (100, 100, 150))
         self.screen.blit(hint, (10, self.config['height'] - 40))
+    
+    def create_particles(self, x, y, color, count=15):
+        """创建粒子爆炸效果"""
+        for _ in range(count):
+            angle = random.uniform(0, math.pi * 2)
+            speed = random.uniform(2, 6)
+            self.particles.append({
+                'x': x * self.config['cell_size'] + self.config['cell_size'] // 2,
+                'y': y * self.config['cell_size'] + self.config['cell_size'] // 2,
+                'vx': math.cos(angle) * speed,
+                'vy': math.sin(angle) * speed,
+                'life': random.uniform(0.5, 1.0),
+                'color': color,
+                'size': random.randint(2, 5)
+            })
+    
+    def update_particles(self):
+        """更新粒子状态"""
+        for p in self.particles[:]:
+            p['x'] += p['vx']
+            p['y'] += p['vy']
+            p['life'] -= 0.02
+            p['size'] = max(1, p['size'] - 0.1)
+        self.particles = [p for p in self.particles if p['life'] > 0]
+    
+    def draw_particles(self):
+        """绘制粒子"""
+        for p in self.particles:
+            alpha = int(255 * p['life'])
+            color = (*p['color'][:3], alpha)
+            pygame.draw.circle(self.screen, p['color'], 
+                             (int(p['x']), int(p['y'])), int(p['size']))
+    
+    def load_leaderboard(self):
+        """加载排行榜"""
+        self.leaderboard_file = os.path.join(os.path.dirname(__file__), 'leaderboard.json')
+        try:
+            with open(self.leaderboard_file, 'r') as f:
+                self.leaderboard = json.load(f)
+        except:
+            self.leaderboard = []
+    
+    def save_leaderboard(self):
+        """保存排行榜"""
+        self.leaderboard.append({
+            'score': self.score,
+            'level': self.level,
+            'date': pygame.time.get_ticks()
+        })
+        self.leaderboard.sort(key=lambda x: x['score'], reverse=True)
+        self.leaderboard = self.leaderboard[:10]  # 保留前 10 名
+        try:
+            with open(self.leaderboard_file, 'w') as f:
+                json.dump(self.leaderboard, f)
+        except:
+            pass
+    
+    def draw_leaderboard(self):
+        """绘制排行榜"""
+        overlay = pygame.Surface((self.config['width'], self.config['height']))
+        overlay.set_alpha(200)
+        overlay.fill((5, 5, 20))
+        self.screen.blit(overlay, (0, 0))
+        
+        title_font = pygame.font.Font(None, 56)
+        title = title_font.render('🏆 排行榜 LEADERBOARD', True, COLORS['glow'])
+        self.screen.blit(title, (self.config['width']//2 - title.get_width()//2, 50))
+        
+        for i, entry in enumerate(self.leaderboard[:10]):
+            color = COLORS['snake_head'] if i == 0 else COLORS['text']
+            if i == 0:
+                text = f'🥇 #{i+1} Score: {entry["score"]} Level: {entry["level"]}'
+            elif i < 3:
+                text = f'🥈 #{i+1} Score: {entry["score"]} Level: {entry["level"]}' if i == 1 else f'🥉 #{i+1} Score: {entry["score"]} Level: {entry["level"]}'
+            else:
+                text = f'#{i+1} Score: {entry["score"]} Level: {entry["level"]}'
+            
+            entry_text = self.font.render(text, True, color)
+            self.screen.blit(entry_text, (self.config['width']//2 - entry_text.get_width()//2, 120 + i * 40))
+        
+        hint = self.font.render('按任意键返回', True, (100, 100, 150))
+        self.screen.blit(hint, (self.config['width']//2 - hint.get_width()//2, self.config['height'] - 80))
     
     def draw_game_over(self):
         """绘制游戏结束画面"""
