@@ -74,12 +74,14 @@ class CyberSnake:
         self.level = 1
         self.particles = []  # 粒子效果列表
         self.show_leaderboard = False
+        self.paused = False
         self.current_skin = 'cyber'
         self.active_effects = {}  # 当前激活的效果
         self.food_type = 'normal'
         self.food = self.spawn_food()
         self.load_leaderboard()
         self.init_sound()
+        self.game_state = 'menu'  # menu, playing, paused, game_over
     
     def spawn_food(self):
         """生成食物位置（支持特殊食物类型）"""
@@ -151,42 +153,82 @@ class CyberSnake:
     
     def handle_keydown(self, key):
         """处理按键"""
+        # 主菜单状态
+        if self.game_state == 'menu':
+            if key == pygame.K_SPACE:
+                self.game_state = 'playing'
+                self.reset_game()
+            elif key == pygame.K_h:
+                self.show_leaderboard = True
+            elif key == pygame.K_ESCAPE:
+                sys.exit()
+            return
+        
         # 排行榜显示时按任意键返回
         if self.show_leaderboard:
             self.show_leaderboard = False
             return
         
-        # 防止直接反向
-        if key == pygame.K_UP and self.direction != (0, 1):
-            self.direction = (0, -1)
-        elif key == pygame.K_DOWN and self.direction != (0, -1):
-            self.direction = (0, 1)
-        elif key == pygame.K_LEFT and self.direction != (1, 0):
-            self.direction = (-1, 0)
-        elif key == pygame.K_RIGHT and self.direction != (-1, 0):
-            self.direction = (1, 0)
-        elif key == pygame.K_r and self.game_over:
-            self.reset_game()
-        elif key == pygame.K_h:
-            self.show_leaderboard = True
-        elif key == pygame.K_1:
-            self.change_skin('cyber')
-        elif key == pygame.K_2:
-            self.change_skin('classic')
-        elif key == pygame.K_3:
-            self.change_skin('rainbow')
-        elif key == pygame.K_4:
-            self.change_skin('fire')
-        elif key == pygame.K_5:
-            self.change_skin('ghost')
-        elif key == pygame.K_m:
-            self.sound_enabled = not self.sound_enabled
-        elif key == pygame.K_ESCAPE:
-            sys.exit()
+        # 暂停状态
+        if self.paused:
+            if key == pygame.K_p:
+                self.paused = False
+                self.game_state = 'playing'
+            elif key == pygame.K_ESCAPE:
+                sys.exit()
+            return
+        
+        # 游戏结束状态
+        if self.game_over:
+            if key == pygame.K_r:
+                self.reset_game()
+                self.game_state = 'playing'
+            elif key == pygame.K_ESCAPE:
+                sys.exit()
+            return
+        
+        # 游戏进行中
+        if self.game_state == 'playing':
+            # 防止直接反向
+            if key == pygame.K_UP and self.direction != (0, 1):
+                self.direction = (0, -1)
+            elif key == pygame.K_DOWN and self.direction != (0, -1):
+                self.direction = (0, 1)
+            elif key == pygame.K_LEFT and self.direction != (1, 0):
+                self.direction = (-1, 0)
+            elif key == pygame.K_RIGHT and self.direction != (-1, 0):
+                self.direction = (1, 0)
+            elif key == pygame.K_p:
+                self.paused = True
+                self.game_state = 'paused'
+            elif key == pygame.K_h:
+                self.show_leaderboard = True
+            elif key == pygame.K_1:
+                self.change_skin('cyber')
+            elif key == pygame.K_2:
+                self.change_skin('classic')
+            elif key == pygame.K_3:
+                self.change_skin('rainbow')
+            elif key == pygame.K_4:
+                self.change_skin('fire')
+            elif key == pygame.K_5:
+                self.change_skin('ghost')
+            elif key == pygame.K_m:
+                self.sound_enabled = not self.sound_enabled
+            elif key == pygame.K_ESCAPE:
+                sys.exit()
     
     def update(self):
         """更新游戏状态"""
-        if self.game_over or self.show_leaderboard:
+        if self.show_leaderboard:
+            self.update_particles()
+            return
+        
+        if self.game_state == 'menu' or self.game_state == 'paused':
+            return
+        
+        if self.game_over:
+            self.game_state = 'game_over'
             self.update_particles()
             return
         
@@ -198,6 +240,7 @@ class CyberSnake:
         # 检测碰撞
         if self.check_collision(new_head):
             self.game_over = True
+            self.game_state = 'game_over'
             self.save_leaderboard()
             return
         
@@ -244,28 +287,35 @@ class CyberSnake:
     
     def draw(self):
         """绘制画面"""
-        self.screen.fill(COLORS['bg'])
-        
-        # 绘制网格
-        self.draw_grid()
-        
-        # 绘制蛇
-        self.draw_snake()
-        
-        # 绘制食物
-        self.draw_food()
-        
-        # 绘制粒子
-        self.draw_particles()
-        
-        # 绘制 UI
-        self.draw_ui()
-        
-        # 游戏结束画面
-        if self.game_over:
+        # 根据游戏状态绘制不同画面
+        if self.game_state == 'menu':
+            self.draw_menu()
+        elif self.game_state == 'paused':
+            # 先绘制游戏画面，再覆盖暂停层
+            self.screen.fill(COLORS['bg'])
+            self.draw_grid()
+            self.draw_snake()
+            self.draw_food()
+            self.draw_particles()
+            self.draw_ui()
+            self.draw_pause()
+        elif self.game_state == 'game_over':
+            self.screen.fill(COLORS['bg'])
+            self.draw_grid()
+            self.draw_snake()
+            self.draw_food()
+            self.draw_particles()
+            self.draw_ui()
             self.draw_game_over()
+        else:  # playing
+            self.screen.fill(COLORS['bg'])
+            self.draw_grid()
+            self.draw_snake()
+            self.draw_food()
+            self.draw_particles()
+            self.draw_ui()
         
-        # 排行榜
+        # 排行榜覆盖层
         if self.show_leaderboard:
             self.draw_leaderboard()
         
@@ -475,6 +525,75 @@ class CyberSnake:
         restart_rect = restart_text.get_rect(center=(self.config['width']//2, self.config['height']//2 + 70))
         self.screen.blit(restart_text, restart_rect)
     
+    def draw_menu(self):
+        """绘制主菜单"""
+        # 背景渐变
+        for y in range(self.config['height']):
+            color_val = int(20 + 10 * math.sin(y / 50 + pygame.time.get_ticks() / 1000))
+            pygame.draw.line(self.screen, (color_val, color_val, color_val + 20),
+                           (0, y), (self.config['width'], y))
+        
+        # 游戏标题（动态颜色）
+        title_font = pygame.font.Font(None, 96)
+        hue = (pygame.time.get_ticks() / 20) % 360
+        title_color = (int(128 + 127 * math.sin(hue / 180 * math.pi)),
+                      int(128 + 127 * math.sin((hue + 120) / 180 * math.pi)),
+                      int(128 + 127 * math.sin((hue + 240) / 180 * math.pi)))
+        title_text = title_font.render('🐍 CYBER SNAKE', True, title_color)
+        title_rect = title_text.get_rect(center=(self.config['width']//2, self.config['height']//3))
+        self.screen.blit(title_text, title_rect)
+        
+        # 副标题
+        subtitle_font = pygame.font.Font(None, 36)
+        subtitle = subtitle_font.render('赛博朋克贪吃蛇', True, COLORS['text'])
+        subtitle_rect = subtitle.get_rect(center=(self.config['width']//2, self.config['height']//3 + 50))
+        self.screen.blit(subtitle, subtitle_rect)
+        
+        # 开始按钮
+        start_font = pygame.font.Font(None, 48)
+        start_text = start_font.render('按 SPACE 开始游戏', True, COLORS['snake_head'])
+        start_rect = start_text.get_rect(center=(self.config['width']//2, self.config['height']//2))
+        self.screen.blit(start_text, start_rect)
+        
+        # 控制说明
+        controls = [
+            '↑↓←→ 移动蛇',
+            '1-5 切换皮肤',
+            'P 暂停',
+            'H 排行榜',
+            'M 音效开关',
+            'ESC 退出'
+        ]
+        ctrl_font = pygame.font.Font(None, 28)
+        for i, ctrl in enumerate(controls):
+            ctrl_text = ctrl_font.render(ctrl, True, (150, 150, 200))
+            ctrl_rect = ctrl_text.get_rect(center=(self.config['width']//2, self.config['height']//2 + 80 + i * 30))
+            self.screen.blit(ctrl_text, ctrl_rect)
+        
+        # 底部提示
+        hint_font = pygame.font.Font(None, 24)
+        hint = hint_font.render('Press SPACE to Start | H for Leaderboard | ESC to Quit', True, (100, 100, 150))
+        hint_rect = hint.get_rect(center=(self.config['width']//2, self.config['height'] - 40))
+        self.screen.blit(hint, hint_rect)
+    
+    def draw_pause(self):
+        """绘制暂停画面"""
+        overlay = pygame.Surface((self.config['width'], self.config['height']))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        # 暂停文字
+        pause_font = pygame.font.Font(None, 72)
+        pause_text = pause_font.render('⏸️ PAUSED', True, COLORS['snake_head'])
+        pause_rect = pause_text.get_rect(center=(self.config['width']//2, self.config['height']//2 - 30))
+        self.screen.blit(pause_text, pause_rect)
+        
+        # 继续提示
+        resume_text = self.font.render('按 P 继续游戏', True, COLORS['text'])
+        resume_rect = resume_text.get_rect(center=(self.config['width']//2, self.config['height']//2 + 30))
+        self.screen.blit(resume_text, resume_rect)
+    
     def run(self):
         """主循环"""
         running = True
@@ -490,4 +609,5 @@ class CyberSnake:
 
 if __name__ == '__main__':
     game = CyberSnake()
+    game.game_state = 'menu'  # 从主菜单开始
     game.run()
