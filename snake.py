@@ -45,7 +45,7 @@ CONFIG = {
     'width': 800,
     'height': 600,
     'cell_size': 20,
-    'fps': 10,
+    'fps': 6,  # 初始速度降低（6 -> 10）
 }
 
 class CyberSnake:

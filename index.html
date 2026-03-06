@@ -171,33 +171,98 @@
         /* 移动端控制 */
         .mobile-controls {
             display: none;
-            margin-top: 20px;
-            gap: 12px;
+            margin-top: 25px;
+            gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
         }
         
-        .mobile-controls button {
-            width: 55px;
-            height: 55px;
-            border: none;
-            border-radius: 14px;
-            background: linear-gradient(145deg, rgba(0, 245, 255, 0.2), rgba(0, 102, 255, 0.2));
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 160px;
+            height: 160px;
+        }
+        
+        .d-pad button {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(0, 245, 255, 0.4);
+            background: linear-gradient(145deg, rgba(5, 5, 16, 0.9), rgba(18, 18, 42, 0.9));
             color: var(--neon-cyan);
-            font-size: 22px;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
             cursor: pointer;
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 245, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(0, 245, 255, 0.2);
-            transition: all 0.2s ease;
+            box-shadow: 
+                0 0 15px rgba(0, 245, 255, 0.2),
+                inset 0 0 10px rgba(0, 245, 255, 0.05);
+            transition: all 0.15s ease;
+            clip-path: polygon(10% 0, 90% 0, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0% 90%, 0% 10%);
         }
         
-        .mobile-controls button:active {
-            transform: scale(0.9);
-            box-shadow: 0 2px 10px rgba(0, 245, 255, 0.3);
+        .d-pad button:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 
+                0 0 25px rgba(0, 245, 255, 0.4),
+                inset 0 0 15px rgba(0, 245, 255, 0.1);
+            transform: translateY(-2px);
         }
         
-        .btn-row { display: flex; gap: 12px; justify-content: center; }
+        .d-pad button:active {
+            transform: translateY(1px);
+            box-shadow: 
+                0 0 8px rgba(0, 245, 255, 0.3),
+                inset 0 0 20px rgba(0, 245, 255, 0.2);
+        }
+        
+        .d-pad button.up { grid-column: 2; grid-row: 1; }
+        .d-pad button.left { grid-column: 1; grid-row: 2; }
+        .d-pad button.pause { grid-column: 2; grid-row: 2; font-size: 14px; }
+        .d-pad button.right { grid-column: 3; grid-row: 2; }
+        .d-pad button.down { grid-column: 2; grid-row: 3; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        
+        .action-btn {
+            width: 45px;
+            height: 45px;
+            border: 2px solid rgba(255, 0, 255, 0.4);
+            background: linear-gradient(145deg, rgba(18, 18, 42, 0.9), rgba(5, 5, 16, 0.9));
+            color: var(--neon-pink);
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.2),
+                inset 0 0 10px rgba(255, 0, 255, 0.05);
+            transition: all 0.15s ease;
+            clip-path: polygon(10% 0, 90% 0, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0% 90%, 0% 10%);
+        }
+        
+        .action-btn:hover {
+            border-color: var(--neon-pink);
+            box-shadow: 
+                0 0 25px rgba(255, 0, 255, 0.4),
+                inset 0 0 15px rgba(255, 0, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .action-btn:active {
+            transform: translateY(1px);
+            box-shadow: 
+                0 0 8px rgba(255, 0, 255, 0.3),
+                inset 0 0 20px rgba(255, 0, 255, 0.2);
+        }
         
         /* 控制提示 */
         .controls {
@@ -460,16 +525,19 @@
         </div>
         
         <div class="mobile-controls" id="mobileControls">
-            <div class="btn-row">
-                <button onclick="setDirection(0, -1)">⬆️</button>
+            <!-- D-Pad 方向键 -->
+            <div class="d-pad">
+                <button class="up" onclick="setDirection(0, -1)">▲</button>
+                <button class="left" onclick="setDirection(-1, 0)">◀</button>
+                <button class="pause" onclick="togglePause()">II</button>
+                <button class="right" onclick="setDirection(1, 0)">▶</button>
+                <button class="down" onclick="setDirection(0, 1)">▼</button>
             </div>
-            <div class="btn-row">
-                <button onclick="setDirection(-1, 0)">⬅️</button>
-                <button onclick="togglePause()">⏸️</button>
-                <button onclick="setDirection(1, 0)">➡️</button>
-            </div>
-            <div class="btn-row">
-                <button onclick="setDirection(0, 1)">⬇️</button>
+            <!-- 功能键 -->
+            <div class="action-buttons">
+                <button class="action-btn" onclick="setSkin('cyber')" title="Cyber">C</button>
+                <button class="action-btn" onclick="setSkin('classic')" title="Classic">S</button>
+                <button class="action-btn" onclick="showLeaderboard()" title="Score">H</button>
             </div>
         </div>
         
@@ -757,7 +825,7 @@
             initGame();
             isGameRunning = true;
             if (gameLoop) clearInterval(gameLoop);
-            gameLoop = setInterval(update, 1000 / (8 + level));
+            gameLoop = setInterval(update, 1000 / (5 + level));  // 初始速度降低：5 -> 8
             draw();
         }
 
