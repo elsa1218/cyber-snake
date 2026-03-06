@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🐍 Cyber Snake | 赛博贪吃蛇</title>
+    
+    <!-- Cache Buster: v3 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        :root {
+            --neon-cyan: #00f5ff;
+            --neon-pink: #ff00ff;
+            --neon-purple: #bd00ff;
+            --neon-blue: #0066ff;
+            --dark-bg: #050510;
+            --dark-surface: #0a0a1a;
+            --dark-card: #12122a;
+            --grid-line: rgba(0, 245, 255, 0.05);
+        }
+        
+        body {
+            background: radial-gradient(ellipse at center, #0a0a1a 0%, #050510 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            position: relative;
+        }
+        
+        /* 动态背景网格 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: 
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+                linear-gradient(var(--grid-line) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        @keyframes gridMove {
+            0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+            100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+        }
+        
+        /* 背景光晕 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 100vw; height: 100vh;
+            transform: translate(-50%, -50%);
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(0, 245, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 0, 255, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        /* 标题 */
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(28px, 5vw, 42px);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-pink) 50%, var(--neon-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(0, 245, 255, 0.5);
+            margin-bottom: 15px;
+            letter-spacing: 3px;
+            animation: titleGlow 3s ease-in-out infinite;
+        }
+        
+        @keyframes titleGlow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+        
+        /* 统计栏 */
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            background: linear-gradient(135deg, rgba(18, 18, 42, 0.9), rgba(5, 5, 16, 0.9));
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            border-radius: 12px;
+            padding: 8px 16px;
+            color: var(--neon-cyan);
+            font-size: 13px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 245, 255, 0.1);
+            min-width: 90px;
+        }
+        
+        .stat-item b {
+            font-size: 16px;
+            font-weight: 700;
+        }
+        
+        /* 游戏画布容器 */
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 
+                0 0 40px rgba(0, 245, 255, 0.2),
+                0 0 80px rgba(0, 245, 255, 0.1),
+                inset 0 0 60px rgba(0, 245, 255, 0.05);
+            border: 2px solid rgba(0, 245, 255, 0.3);
+        }
+        
+        .canvas-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            background: linear-gradient(45deg, var(--neon-cyan), transparent, var(--neon-pink), transparent, var(--neon-cyan));
+            background-size: 400% 400%;
+            border-radius: 16px;
+            z-index: -1;
+            animation: borderGlow 4s ease infinite;
+        }
+        
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        canvas {
+            display: block;
+            background: linear-gradient(135deg, #0a0a1a 0%, #12122a 100%);
+            max-width: 100%;
+            max-height: 55vh;
+        }
+        
+        /* 移动端控制 */
+        .mobile-controls {
+            display: none;
+            margin-top: 25px;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 160px;
+            height: 160px;
+        }
+        
+        .d-pad button {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(0, 245, 255, 0.4);
+            background: linear-gradient(145deg, rgba(5, 5, 16, 0.9), rgba(18, 18, 42, 0.9));
+            color: var(--neon-cyan);
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            box-shadow: 
+                0 0 15px rgba(0, 245, 255, 0.2),
+                inset 0 0 10px rgba(0, 245, 255, 0.05);
+            transition: all 0.15s ease;
+            clip-path: polygon(10% 0, 90% 0, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0% 90%, 0% 10%);
+        }
+        
+        .d-pad button:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 
+                0 0 25px rgba(0, 245, 255, 0.4),
+                inset 0 0 15px rgba(0, 245, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .d-pad button:active {
+            transform: translateY(1px);
+            box-shadow: 
+                0 0 8px rgba(0, 245, 255, 0.3),
+                inset 0 0 20px rgba(0, 245, 255, 0.2);
+        }
+        
+        .d-pad button.up { grid-column: 2; grid-row: 1; }
+        .d-pad button.left { grid-column: 1; grid-row: 2; }
+        .d-pad button.pause { grid-column: 2; grid-row: 2; font-size: 14px; }
+        .d-pad button.right { grid-column: 3; grid-row: 2; }
+        .d-pad button.down { grid-column: 2; grid-row: 3; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        
+        .action-btn {
+            width: 45px;
+            height: 45px;
+            border: 2px solid rgba(255, 0, 255, 0.4);
+            background: linear-gradient(145deg, rgba(18, 18, 42, 0.9), rgba(5, 5, 16, 0.9));
+            color: var(--neon-pink);
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.2),
+                inset 0 0 10px rgba(255, 0, 255, 0.05);
+            transition: all 0.15s ease;
+            clip-path: polygon(10% 0, 90% 0, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0% 90%, 0% 10%);
+        }
+        
+        .action-btn:hover {
+            border-color: var(--neon-pink);
+            box-shadow: 
+                0 0 25px rgba(255, 0, 255, 0.4),
+                inset 0 0 15px rgba(255, 0, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .action-btn:active {
+            transform: translateY(1px);
+            box-shadow: 
+                0 0 8px rgba(255, 0, 255, 0.3),
+                inset 0 0 20px rgba(255, 0, 255, 0.2);
+        }
+        
+        /* 控制提示 */
+        .controls {
+            margin-top: 15px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            letter-spacing: 1px;
+            font-weight: 300;
+        }
+        
+        /* 覆盖层通用样式 */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.92);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+        
+        .overlay.hidden { display: none; }
+        
+        /* 菜单样式 */
+        .menu {
+            text-align: center;
+            color: white;
+            max-width: 400px;
+            width: 100%;
+            animation: menuFadeIn 0.5s ease-out;
+        }
+        
+        @keyframes menuFadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .menu h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(32px, 6vw, 48px);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-pink) 50%, var(--neon-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+            filter: drop-shadow(0 0 30px rgba(0, 245, 255, 0.5));
+            animation: rainbowGlow 3s linear infinite;
+        }
+        
+        @keyframes rainbowGlow {
+            0%, 100% { filter: drop-shadow(0 0 30px rgba(0, 245, 255, 0.5)) hue-rotate(0deg); }
+            50% { filter: drop-shadow(0 0 40px rgba(255, 0, 255, 0.5)) hue-rotate(30deg); }
+        }
+        
+        .menu .subtitle {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+        
+        /* 开始按钮 */
+        .start-btn {
+            padding: 16px 50px;
+            font-size: 18px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            letter-spacing: 2px;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%);
+            color: white;
+            cursor: pointer;
+            box-shadow: 
+                0 8px 30px rgba(0, 245, 255, 0.4),
+                0 0 60px rgba(0, 245, 255, 0.2);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        
+        .start-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 
+                0 12px 40px rgba(0, 245, 255, 0.5),
+                0 0 80px rgba(0, 245, 255, 0.3);
+        }
+        
+        .start-btn:active {
+            transform: translateY(-1px) scale(0.98);
+        }
+        
+        /* 皮肤选择器 */
+        .skin-selector {
+            margin-top: 25px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .skin-btn {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(0, 245, 255, 0.3);
+            border-radius: 14px;
+            background: linear-gradient(145deg, rgba(18, 18, 42, 0.8), rgba(5, 5, 16, 0.8));
+            color: white;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .skin-btn:hover {
+            transform: translateY(-3px);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 8px 20px rgba(0, 245, 255, 0.3);
+        }
+        
+        .skin-btn.active {
+            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
+            transform: scale(1.1);
+        }
+        
+        .skin-label {
+            margin-top: 15px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+        
+        /* 排行榜 */
+        .leaderboard {
+            background: linear-gradient(135deg, rgba(18, 18, 42, 0.9), rgba(5, 5, 16, 0.9));
+            padding: 25px;
+            border-radius: 20px;
+            margin-top: 20px;
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            box-shadow: inset 0 0 40px rgba(0, 245, 255, 0.05);
+        }
+        
+        .leaderboard h3 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-pink);
+            margin-bottom: 15px;
+            font-size: 20px;
+            letter-spacing: 2px;
+        }
+        
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(0, 102, 255, 0.05));
+            border-radius: 10px;
+            border: 1px solid rgba(0, 245, 255, 0.1);
+            color: var(--neon-cyan);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .leaderboard-item:hover {
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.15), rgba(0, 102, 255, 0.1));
+            transform: translateX(5px);
+        }
+        
+        .leaderboard-item.top-3 {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 100, 0, 0.05));
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        
+        /* 滚动条 */
+        .leaderboard::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .leaderboard::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+        
+        .leaderboard::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 3px;
+        }
+        
+        /* 次要按钮 */
+        .secondary-btn {
+            margin-top: 12px;
+            padding: 12px 35px;
+            font-size: 14px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 500;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .secondary-btn:hover {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            background: rgba(0, 245, 255, 0.1);
+        }
+        
+        /* 扫描线效果 */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.3;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 480px) {
+            .container { padding: 15px; }
+            .stat-item { min-width: 75px; padding: 6px 12px; font-size: 12px; }
+            .stat-item b { font-size: 14px; }
+            .mobile-controls { display: flex; }
+            .controls { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    
+    <div class="container">
+        <h1>CYBER SNAKE v3</h1>
+        <div class="stats">
+            <div class="stat-item">🏆 分数 <b id="score">0</b></div>
+            <div class="stat-item">⚡ 等级 <b id="level">1</b></div>
+            <div class="stat-item">🎭 皮肤 <b id="skin-name">cyber</b></div>
+        </div>
+        
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+        
+        <div class="mobile-controls" id="mobileControls">
+            <!-- D-Pad 方向键 -->
+            <div class="d-pad">
+                <button class="up" onclick="setDirection(0, -1)">▲</button>
+                <button class="left" onclick="setDirection(-1, 0)">◀</button>
+                <button class="pause" onclick="togglePause()">II</button>
+                <button class="right" onclick="setDirection(1, 0)">▶</button>
+                <button class="down" onclick="setDirection(0, 1)">▼</button>
+            </div>
+            <!-- 功能键 -->
+            <div class="action-buttons">
+                <button class="action-btn" onclick="setSkin('cyber')" title="Cyber">C</button>
+                <button class="action-btn" onclick="setSkin('classic')" title="Classic">S</button>
+                <button class="action-btn" onclick="showLeaderboard()" title="Score">H</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            SPACE 开始 | ↑↓←→ 移动 | P 暂停 | 1-5 皮肤 | H 排行榜
+        </div>
+    </div>
+
+    <!-- 主菜单 -->
+    <div class="overlay" id="menuOverlay">
+        <div class="menu">
+            <h2>CYBER SNAKE v3</h2>
+            <p class="subtitle">赛博朋克贪吃蛇</p>
+            <button class="start-btn" onclick="startGame()">🎮 开始游戏</button>
+            
+            <div class="skin-selector">
+                <button class="skin-btn active" onclick="setSkin('cyber')" title="赛博">🤖</button>
+                <button class="skin-btn" onclick="setSkin('classic')" title="经典">🐍</button>
+                <button class="skin-btn" onclick="setSkin('rainbow')" title="彩虹">🦄</button>
+                <button class="skin-btn" onclick="setSkin('fire')" title="火焰">🔥</button>
+                <button class="skin-btn" onclick="setSkin('ghost')" title="幽灵">👻</button>
+            </div>
+            <p class="skin-label">选择你的战甲</p>
+            
+            <button class="secondary-btn" onclick="showLeaderboard()" style="margin-top: 20px;">🏆 查看排行榜</button>
+        </div>
+    </div>
+
+    <!-- 排行榜 -->
+    <div class="overlay hidden" id="leaderboardOverlay">
+        <div class="menu">
+            <h2>🏆 排行榜</h2>
+            <div class="leaderboard" id="leaderboardList">
+                <p style="color: rgba(255,255,255,0.4);">暂无记录</p>
+            </div>
+            <button class="start-btn" onclick="closeLeaderboard()" style="margin-top: 20px; padding: 12px 40px; font-size: 16px;">关闭</button>
+        </div>
+    </div>
+
+    <!-- 游戏结束 -->
+    <div class="overlay hidden" id="gameOverOverlay">
+        <div class="menu">
+            <h2 style="font-size: 36px;">💀 GAME OVER</h2>
+            <p style="font-size: 28px; color: var(--neon-cyan); margin: 20px 0;">
+                最终得分 <b style="font-size: 42px; display: block; margin-top: 10px;" id="finalScore">0</b>
+            </p>
+            <button class="start-btn" onclick="startGame()">🔄 再来一局</button>
+            <br>
+            <button class="secondary-btn" onclick="showMenu()">📋 返回菜单</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const CELL_SIZE = 20;
+        const GRID_W = canvas.width / CELL_SIZE;
+        const GRID_H = canvas.height / CELL_SIZE;
+        
+        const COLORS = {
+            bg: '#0a0a1a',
+            snakeHead: '#00f5ff',
+            snakeBody: '#008080',
+            food: '#ff00ff',
+            grid: 'rgba(0, 245, 255, 0.08)',
+            text: '#00f5ff',
+            glow: '#ff00ff'
+        };
+
+        const SKINS = {
+            cyber: { emoji: '🤖', color: '#00f5ff', name: '赛博' },
+            classic: { emoji: '🐍', color: '#00ff00', name: '经典' },
+            rainbow: { emoji: '🦄', color: '#ff00ff', name: '彩虹' },
+            fire: { emoji: '🔥', color: '#ff6600', name: '火焰' },
+            ghost: { emoji: '👻', color: '#cccccc', name: '幽灵' }
+        };
+
+        const FOOD_TYPES = {
+            normal: { emoji: '🍎', color: '#ff0080', points: 10 },
+            double: { emoji: '⭐', color: '#ffd700', points: 20 },
+            speed: { emoji: '⚡', color: '#00ff00', points: 15 },
+            slow: { emoji: '🐌', color: '#0066ff', points: 15 },
+            bonus: { emoji: '💎', color: '#ff00ff', points: 50 }
+        };
+
+        let snake = [];
+        let direction = { x: 1, y: 0 };
+        let food = {};
+        let score = 0;
+        let level = 1;
+        let gameLoop = null;
+        let currentSkin = 'cyber';
+        let leaderboard = JSON.parse(localStorage.getItem('snakeLeaderboard') || '[]');
+        let isPaused = false;
+        let isGameRunning = false;
+
+        function initGame() {
+            snake = [{ x: Math.floor(GRID_W / 2), y: Math.floor(GRID_H / 2) }];
+            direction = { x: 1, y: 0 };
+            score = 0;
+            level = 1;
+            isPaused = false;
+            spawnFood();
+            updateStats();
+        }
+
+        function spawnFood() {
+            let type = 'normal';
+            if (Math.random() < 0.2) {
+                const types = ['double', 'speed', 'slow', 'bonus'];
+                type = types[Math.floor(Math.random() * types.length)];
+            }
+            let pos;
+            do {
+                pos = {
+                    x: Math.floor(Math.random() * GRID_W),
+                    y: Math.floor(Math.random() * GRID_H)
+                };
+            } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+            food = { ...pos, ...FOOD_TYPES[type], type };
+        }
+
+        function update() {
+            if (isPaused || !isGameRunning) return;
+
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            if (head.x < 0 || head.x >= GRID_W || head.y < 0 || head.y >= GRID_H ||
+                snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score += food.points;
+                if (score % 50 === 0) level++;
+                spawnFood();
+                updateStats();
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        function draw() {
+            // 背景渐变
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#0a0a1a');
+            gradient.addColorStop(1, '#12122a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 网格
+            ctx.strokeStyle = COLORS.grid;
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += CELL_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += CELL_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // 蛇
+            const skin = SKINS[currentSkin];
+            snake.forEach((seg, i) => {
+                const segGradient = ctx.createLinearGradient(
+                    seg.x * CELL_SIZE, seg.y * CELL_SIZE,
+                    seg.x * CELL_SIZE + CELL_SIZE, seg.y * CELL_SIZE + CELL_SIZE
+                );
+                segGradient.addColorStop(0, i === 0 ? skin.color : COLORS.snakeBody);
+                segGradient.addColorStop(1, i === 0 ? '#008080' : '#004040');
+                
+                ctx.fillStyle = segGradient;
+                ctx.beginPath();
+                ctx.roundRect(
+                    seg.x * CELL_SIZE + 2,
+                    seg.y * CELL_SIZE + 2,
+                    CELL_SIZE - 4,
+                    CELL_SIZE - 4,
+                    6
+                );
+                ctx.fill();
+                
+                // 发光效果
+                ctx.shadowColor = skin.color;
+                ctx.shadowBlur = i === 0 ? 15 : 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // 蛇头 emoji
+                if (i === 0) {
+                    ctx.font = `bold ${CELL_SIZE - 2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(skin.emoji,
+                        seg.x * CELL_SIZE + CELL_SIZE / 2,
+                        seg.y * CELL_SIZE + CELL_SIZE / 2
+                    );
+                }
+            });
+
+            // 食物发光
+            const foodGradient = ctx.createRadialGradient(
+                food.x * CELL_SIZE + CELL_SIZE / 2,
+                food.y * CELL_SIZE + CELL_SIZE / 2,
+                0,
+                food.x * CELL_SIZE + CELL_SIZE / 2,
+                food.y * CELL_SIZE + CELL_SIZE / 2,
+                CELL_SIZE
+            );
+            foodGradient.addColorStop(0, food.color);
+            foodGradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = foodGradient;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * CELL_SIZE + CELL_SIZE / 2,
+                food.y * CELL_SIZE + CELL_SIZE / 2,
+                CELL_SIZE,
+                0, Math.PI * 2
+            );
+            ctx.fill();
+
+            // 食物核心
+            ctx.beginPath();
+            ctx.arc(
+                food.x * CELL_SIZE + CELL_SIZE / 2,
+                food.y * CELL_SIZE + CELL_SIZE / 2,
+                CELL_SIZE / 2 - 2,
+                0, Math.PI * 2
+            );
+            ctx.fillStyle = food.color;
+            ctx.shadowColor = food.color;
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 食物 emoji
+            ctx.font = `bold ${CELL_SIZE - 2}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(food.emoji,
+                food.x * CELL_SIZE + CELL_SIZE / 2,
+                food.y * CELL_SIZE + CELL_SIZE / 2
+            );
+        }
+
+        function updateStats() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('level').textContent = level;
+            document.getElementById('skin-name').textContent = SKINS[currentSkin].name;
+        }
+
+        function setDirection(x, y) {
+            if (direction.x === -x && direction.y === -y) return;
+            direction = { x, y };
+        }
+
+        function setSkin(skin) {
+            currentSkin = skin;
+            document.querySelectorAll('.skin-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            updateStats();
+        }
+
+        function togglePause() {
+            if (!isGameRunning) return;
+            isPaused = !isPaused;
+        }
+
+        function startGame() {
+            document.getElementById('menuOverlay').classList.add('hidden');
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            initGame();
+            isGameRunning = true;
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, 1000 / (5 + level));  // 初始速度降低：5 -> 8
+            draw();
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            clearInterval(gameLoop);
+            
+            leaderboard.push({ score, level, date: Date.now() });
+            leaderboard.sort((a, b) => b.score - a.score);
+            leaderboard = leaderboard.slice(0, 10);
+            localStorage.setItem('snakeLeaderboard', JSON.stringify(leaderboard));
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverOverlay').classList.remove('hidden');
+        }
+
+        function showMenu() {
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            document.getElementById('menuOverlay').classList.remove('hidden');
+        }
+
+        function showLeaderboard() {
+            const list = document.getElementById('leaderboardList');
+            if (leaderboard.length === 0) {
+                list.innerHTML = '<p style="color: rgba(255,255,255,0.4);">暂无记录</p>';
+            } else {
+                list.innerHTML = leaderboard.map((entry, i) => `
+                    <div class="leaderboard-item ${i < 3 ? 'top-3' : ''}">
+                        <span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
+                        <span>${entry.score} 分 · Lv.${entry.level}</span>
+                        <span style="opacity: 0.5; font-size: 12px;">${new Date(entry.date).toLocaleDateString()}</span>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('leaderboardOverlay').classList.remove('hidden');
+        }
+
+        function closeLeaderboard() {
+            document.getElementById('leaderboardOverlay').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isGameRunning) {
+                startGame();
+            } else if (e.code === 'KeyP') {
+                togglePause();
+            } else if (e.code === 'KeyH') {
+                showLeaderboard();
+            } else if (e.code === 'ArrowUp') setDirection(0, -1);
+            else if (e.code === 'ArrowDown') setDirection(0, 1);
+            else if (e.code === 'ArrowLeft') setDirection(-1, 0);
+            else if (e.code === 'ArrowRight') setDirection(1, 0);
+            else if (e.code === 'Digit1') setSkin('cyber');
+            else if (e.code === 'Digit2') setSkin('classic');
+            else if (e.code === 'Digit3') setSkin('rainbow');
+            else if (e.code === 'Digit4') setSkin('fire');
+            else if (e.code === 'Digit5') setSkin('ghost');
+        });
+
+        if ('ontouchstart' in window) {
+            document.getElementById('mobileControls').style.display = 'flex';
+        }
+
+        draw();
+    </script>
+</body>
+</html>
